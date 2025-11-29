@@ -1,22 +1,27 @@
 
-struct DType:
+struct DType(EqualityComparable):
     var _value: Int
-    var _name: String
 
-    alias U8 = DType(0, "u8")
-    alias U32 = DType(1, "u32")
-    alias I16 = DType(2, "i16")
-    alias I32 = DType(3, "i32")
-    alias I64 = DType(4, "i64")
-    alias BF16 = DType(5, "bf16")
-    alias F16 = DType(6, "f16")
-    alias F32 = DType(7, "f32")
-    alias F64 = DType(8, "f64")
-    alias F8E4M3 = DType(9, "f8e4m3")
-    alias F6E2M3 = DType(10, "f6e2m3")
-    alias F6E3M2 = DType(11, "f6e3m2")
-    alias F4 = DType(12, "f4")
-    alias F8E8M0 = DType(13, "f8e8m0")
+    # We use static methods as factories instead of alias with heap types
+    # or just simple integer constants wrapped in DType
+
+    alias U8 = DType(0)
+    alias U32 = DType(1)
+    alias I16 = DType(2)
+    alias I32 = DType(3)
+    alias I64 = DType(4)
+    alias BF16 = DType(5)
+    alias F16 = DType(6)
+    alias F32 = DType(7)
+    alias F64 = DType(8)
+    alias F8E4M3 = DType(9)
+    alias F6E2M3 = DType(10)
+    alias F6E3M2 = DType(11)
+    alias F4 = DType(12)
+    alias F8E8M0 = DType(13)
+
+    fn __init__(inout self, value: Int):
+        self._value = value
 
     fn __eq__(self, other: DType) -> Bool:
         return self._value == other._value
@@ -25,7 +30,21 @@ struct DType:
         return self._value != other._value
 
     fn as_str(self) -> String:
-        return self._name
+        if self == Self.U8: return "u8"
+        if self == Self.U32: return "u32"
+        if self == Self.I16: return "i16"
+        if self == Self.I32: return "i32"
+        if self == Self.I64: return "i64"
+        if self == Self.BF16: return "bf16"
+        if self == Self.F16: return "f16"
+        if self == Self.F32: return "f32"
+        if self == Self.F64: return "f64"
+        if self == Self.F8E4M3: return "f8e4m3"
+        if self == Self.F6E2M3: return "f6e2m3"
+        if self == Self.F6E3M2: return "f6e3m2"
+        if self == Self.F4: return "f4"
+        if self == Self.F8E8M0: return "f8e8m0"
+        return "unknown"
 
     fn size_in_bytes(self) -> Int:
         if self == Self.U8 or self == Self.F8E4M3 or self == Self.F8E8M0:

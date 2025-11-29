@@ -1,4 +1,5 @@
 from collections import List
+from .error import Error
 
 struct Shape(CollectionElement, Sized, Stringable):
     var dims: List[Int]
@@ -40,7 +41,7 @@ struct Shape(CollectionElement, Sized, Stringable):
             return 1 # Scalar
         var count = 1
         for d in self.dims:
-            count *= d[]
+            count *= d
         return count
 
     fn stride_contiguous(self) -> List[Int]:
@@ -70,3 +71,35 @@ struct Shape(CollectionElement, Sized, Stringable):
                 return False
             acc *= dim
         return True
+
+    fn broadcast_shape_binary_op(self, rhs: Shape) raises -> Shape:
+        var lhs_dims = self.dims
+        var rhs_dims = rhs.dims
+        var lhs_ndims = len(lhs_dims)
+        var rhs_ndims = len(rhs_dims)
+        var bcast_ndims = max(lhs_ndims, rhs_ndims)
+
+        var bcast_dims = List[Int](capacity=bcast_ndims)
+        for _ in range(bcast_ndims):
+            bcast_dims.append(0)
+
+        for idx in range(bcast_ndims):
+            var rev_idx = bcast_ndims - idx
+            var l_value = 1
+            if lhs_ndims >= rev_idx:
+                l_value = lhs_dims[lhs_ndims - rev_idx]
+            var r_value = 1
+            if rhs_ndims >= rev_idx:
+                r_value = rhs_dims[rhs_ndims - rev_idx]
+
+            if l_value != r_value and l_value != 1 and r_value != 1:
+                raise Error("Shape mismatch in broadcast")
+
+            if l_value == r_value:
+                bcast_dims[idx] = l_value
+            elif l_value == 1:
+                bcast_dims[idx] = r_value
+            else:
+                bcast_dims[idx] = l_value
+
+        return Shape(bcast_dims)
