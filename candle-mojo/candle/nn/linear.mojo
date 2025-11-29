@@ -1,4 +1,5 @@
 from ..tensor import Tensor
+from ..op_enums import BackpropOp
 from . import Module
 
 struct Linear(Module):
@@ -18,6 +19,10 @@ struct Linear(Module):
         self.bias = other.bias
 
     fn forward(self, x: Tensor) raises -> Tensor:
+        # x: (Batch, In)
+        # w: (Out, In)
+        # w.T: (In, Out)
+        # x @ w.T -> (Batch, Out)
         var w = self.weight
         var x_matmul = x.matmul(w.transpose(0, 1))
         # Add bias (broadcasted)

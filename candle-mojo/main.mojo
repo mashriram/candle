@@ -1,82 +1,83 @@
-from candle.tensor import Tensor
+from candle.tensor import Tensor, BackpropOp
 from candle.device import Device
 from candle.dtype import DType
 from candle.shape import Shape
 from candle.nn.linear import Linear
+from candle.optim import SGD
 from collections import List
+import math
 
 fn main() raises:
-    print("Running Candle Mojo Example...")
+    print("Running Candle Mojo Training Example...")
     var device = Device.CPU
 
-    # 1. Advanced Ops: Broadcasting & Transpose
-    print("\n--- Testing Broadcasting & Transpose ---")
-    var shape_a = Shape(2, 3)
-    var data_a = List[Float32]()
-    # [1, 2, 3]
-    # [4, 5, 6]
-    for i in range(6): data_a.append(Float32(i+1))
-    var A = Tensor.new(data_a, shape_a, device)
+    # 1. Setup Data: Simple Linear Regression y = 2x + 1
+    # X: (4, 1)
+    var x_data = List[Float32]()
+    x_data.append(1.0); x_data.append(2.0); x_data.append(3.0); x_data.append(4.0)
+    var X = Tensor.new(x_data, Shape(4, 1), device)
 
-    # Broadcast add: (2, 3) + (1, 3)
-    var shape_b = Shape(1, 3)
-    var data_b = List[Float32]()
-    # [10, 20, 30]
-    data_b.append(10.0); data_b.append(20.0); data_b.append(30.0)
-    var B = Tensor.new(data_b, shape_b, device)
+    # Y: (4, 1)
+    var y_data = List[Float32]()
+    y_data.append(3.0); y_data.append(5.0); y_data.append(7.0); y_data.append(9.0)
+    var Y = Tensor.new(y_data, Shape(4, 1), device)
 
-    print("A:\n" + str(A))
-    print("B:\n" + str(B))
+    # 2. Setup Model
+    # Linear(1 -> 1)
+    # Weight: (1, 1)
+    var w_data = List[Float32]()
+    w_data.append(0.5) # Initial guess
+    var W = Tensor.from_storage(
+        Storage(w_data, DType.F32, device),
+        Layout.contiguous(Shape(1, 1)),
+        BackpropOp.none(),
+        True # is_variable
+    )
 
-    var C = A.add(B)
-    print("A + B (Broadcasting):\n" + str(C))
-    # Expected:
-    # [11, 22, 33]
-    # [14, 25, 36]
+    # Bias: (1,)
+    var b_data = List[Float32]()
+    b_data.append(0.0) # Initial guess
+    var B = Tensor.from_storage(
+        Storage(b_data, DType.F32, device),
+        Layout.contiguous(Shape(1)),
+        BackpropOp.none(),
+        True # is_variable
+    )
 
-    print("A Transposed:\n" + str(A.transpose(0, 1)))
+    var model = Linear(W, B)
+    var optimizer = SGD(0.01) # Learning rate
 
-    # 2. Testing Linear Layer
-    print("\n--- Testing Linear Layer ---")
-    # Weights: (Out, In) -> (2, 3)
-    var shape_w = Shape(2, 3)
-    var data_w = List[Float32]()
-    # w = [[1, 1, 1], [1, 1, 1]]
-    for _ in range(6): data_w.append(1.0)
-    var W = Tensor.new(data_w, shape_w, device)
+    print("Initial Weight: " + str(model.weight))
+    print("Initial Bias: " + str(model.bias))
 
-    # Bias: (Out,) -> (2,) or (1, 2) for broadcasting?
-    # Usually bias is (Out,), broadcasted to (Batch, Out).
-    # Matmul result will be (Batch, Out).
-    var shape_bias = Shape(2)
-    var data_bias = List[Float32]()
-    data_bias.append(0.5); data_bias.append(0.5)
-    var Bias = Tensor.new(data_bias, shape_bias, device)
+    # 3. Training Loop
+    for epoch in range(10):
+        # Forward
+        var pred = model.forward(X)
 
-    var linear = Linear(W, Bias)
+        # Loss (MSE) = (pred - Y)^2
+        var diff = pred.sub(Y)
+        var sqr_diff = diff.sqr()
 
-    # Input: (Batch, In) -> (1, 3)
-    # x = [[1, 2, 3]]
-    var shape_x = Shape(1, 3)
-    var data_x = List[Float32]()
-    data_x.append(1.0); data_x.append(2.0); data_x.append(3.0)
-    var X = Tensor.new(data_x, shape_x, device)
+        # Backward
+        var grads_map = sqr_diff.backward()
 
-    print("Input X:\n" + str(X))
-    var output = linear.forward(X)
-    print("Linear(X):\n" + str(output))
-    # Calculation:
-    # X @ W.T
-    # [1, 2, 3] @ [[1, 1], [1, 1], [1, 1]] = [6, 6]
-    # + Bias [0.5, 0.5]
-    # = [6.5, 6.5]
+        # Step (Functional update)
+        var params = List[Tensor]()
+        params.append(model.weight)
+        params.append(model.bias)
 
-    # 3. Unary Ops
-    print("\n--- Testing Unary Ops ---")
-    var neg_x = X.neg()
-    print("Neg(X):\n" + str(neg_x))
+        var new_params = optimizer.step_and_replace(params, grads_map.grads, grads_map.ids)
 
-    var sqr_x = X.sqr()
-    print("Sqr(X):\n" + str(sqr_x))
+        # Update model
+        model.weight = new_params[0]
+        model.bias = new_params[1]
 
-    print("Done.")
+        if epoch % 2 == 0:
+             # Basic loss logging (just inspecting data of first element for now)
+             # Real implementation would have .item()
+             print("Epoch " + str(epoch) + " | Weight: " + str(model.weight) + " | Bias: " + str(model.bias))
+
+    print("Final Weight: " + str(model.weight))
+    print("Final Bias: " + str(model.bias))
+    print("Target: 2.0, 1.0")
